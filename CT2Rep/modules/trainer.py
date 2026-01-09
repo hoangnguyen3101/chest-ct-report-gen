@@ -6,7 +6,7 @@ import torch
 import pandas as pd
 from numpy import inf
 import csv
-
+import wandb
 
 class BaseTrainer(object):
     def __init__(self, model, criterion, metric_ftns, optimizer, args):
@@ -205,6 +205,21 @@ class Trainer(BaseTrainer):
                 val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(val_gts)},
                                            {i: [re] for i, re in enumerate(val_res)})
                 log.update(**{'val_' + k: v for k, v in val_met.items()})
+
         self.lr_scheduler.step()
+
+        # Chuẩn bị dữ liệu log tập trung
+        wandb_log_data = {
+            "epoch": epoch,
+            "train_loss": log['train_loss'],
+            "learning_rate": self.optimizer.param_groups[0]['lr']
+        }
+
+        # Nếu có kết quả validation từ khối if(epoch%1==0) phía trên
+        if 'val_met' in locals():
+            for k, v in val_met.items():
+                wandb_log_data[f"val_{k}"] = v
+        
+        wandb.log(wandb_log_data)
 
         return log

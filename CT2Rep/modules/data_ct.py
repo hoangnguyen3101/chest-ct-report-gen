@@ -39,11 +39,19 @@ class CTReportDataset(Dataset):
         self.nii_to_tensor = partial(self.nii_img_to_tensor, transform = self.transform)
         self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames) if force_num_frames else identity
 
-    def load_accession_text(self, xlsx_file):
-        df = pd.read_excel(xlsx_file)
+    def load_accession_text(self, csv_file):
+        df = pd.read_csv(csv_file)
         accession_to_text = {}
         for index, row in df.iterrows():
-            accession_to_text[row['AccessionNo']] = row["Findings_EN"]
+            key = row.get('VolumeName', None)
+            if pd.isna(key):
+                continue
+            val = row.get('Findings_EN', "")
+            if pd.isna(val):
+                val = ""
+            else:
+                val = str(val)
+            accession_to_text[str(key)] = val
         return accession_to_text
 
 
@@ -51,13 +59,13 @@ class CTReportDataset(Dataset):
         samples = []
         for patient_folder in tqdm.tqdm(glob.glob(os.path.join(self.data_folder, '*'))):
             for accession_folder in glob.glob(os.path.join(patient_folder, '*')):
-                accession_number = os.path.basename(accession_folder)
-                if accession_number not in self.accession_to_text:
-                    continue
+                for nii_file in glob.glob(os.path.join(accession_folder, '*.nii.gz')):
+                    filename = os.path.basename(nii_file)
+                    if filename not in self.accession_to_text:
+                        continue
 
-                impression_text = self.accession_to_text[accession_number]
+                    impression_text = self.accession_to_text[filename]
 
-                for nii_file in glob.glob(os.path.join(accession_folder, '*.npz')):
                     # Construct the input text with the included metadata
                     if impression_text == "Not given.":
                         impression_text=""
@@ -74,10 +82,7 @@ class CTReportDataset(Dataset):
         return len(self.samples)
 
     def nii_img_to_tensor(self, path, transform):
-        img_data = np.load(path)["arr_0"]
-    
-        img_data= np.transpose(img_data, (1, 2, 0))
-        img_data = img_data*1000
+        img_data = nib.load(path).get_fdata()
         hu_min, hu_max = -1000, 200
         img_data = np.clip(img_data, hu_min, hu_max)
 

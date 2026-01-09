@@ -9,7 +9,7 @@ from modules.trainer import Trainer
 from modules.loss import compute_loss
 from models.ct2rep import CT2RepModel
 from modules.data_ct import CTReportDataset
-
+import wandb
 def parse_agrs():
     parser = argparse.ArgumentParser()
 
@@ -73,12 +73,11 @@ def parse_agrs():
     parser.add_argument('--gamma', type=float, default=0.1, help='the gamma of the learning rate scheduler.')
 
     # Others
-    parser.add_argument('--xlsxfile', type=str, default="../example_data/CT2Rep/data_reports_example.xlsx", help='reports xlsx file.')
+    parser.add_argument('--xlsxfile', type=str, default="../example_data/train_reports.csv", help='reports csv file.')
     parser.add_argument('--trainfolder', type=str, default="../example_data/CT2Rep/train", help='train folder.')
     parser.add_argument('--validfolder', type=str, default="../example_data/CT2Rep/valid", help='valid folder.')
 
     parser.add_argument('--resume', type=str, help='whether to resume the training from existing checkpoints.')
-
 
     args = parser.parse_args()
     return args
@@ -87,7 +86,11 @@ def parse_agrs():
 def main():
     # parse arguments
     args = parse_agrs()
-
+    wandb.init(
+        project="CT2Rep",
+        config= args,
+        name = f"run_ep{args.epochs}_lr{args.lr_ve}",
+    )
     # create tokenizer
     tokenizer = Tokenizer(args)
 

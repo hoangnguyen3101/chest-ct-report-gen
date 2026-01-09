@@ -20,11 +20,21 @@ class Tokenizer(object):
             json.dump(self.token2idx, json_file)
 
 
-    def load_accession_text(self, xlsx_file):
-        df = pd.read_excel(xlsx_file)
+    def load_accession_text(self, csv_file):
+        df = pd.read_csv(csv_file)
         accession_to_text = {}
         for index, row in df.iterrows():
-            accession_to_text[row['AccessionNo']] = row["Findings_EN"]
+            # normalize key (expected filename) and skip invalid keys
+            key = row.get('VolumeName', None)
+            if pd.isna(key):
+                continue
+            # normalize findings text: replace NaN with empty string and ensure string type
+            val = row.get('Findings_EN', "")
+            if pd.isna(val):
+                val = ""
+            else:
+                val = str(val)
+            accession_to_text[str(key)] = val
         return accession_to_text
 
     def create_vocabulary(self):
