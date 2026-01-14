@@ -26,7 +26,7 @@ cd ..
 To train the models, go to the corresponding directory, and run the command
 
 ```train
-python main.py --max_seq_length 300 --threshold 10 --epochs 100 --save_dir results/test_ct2rep/ --step_size 1 --gamma 0.8 --batch_size 1 --d_vf 512
+python main.py --max_seq_length 300 --threshold 5 --epochs 30 --save_dir results/test_ct2rep/ --step_size 1 --gamma 0.8 --batch_size 1 --d_vf 512
 ```
 The threshold is the minimum number of instances in the dataset for a token to be put in the tokens dictionary. You can select the directories, xlsx files, longitudinal files, etc. with the corresponding keyword arguments.
 
