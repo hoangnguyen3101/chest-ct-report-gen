@@ -6,7 +6,6 @@ CT2RepLong/
 CT2Rep_old/
 
 # Ignore experimental / build files
-ctvit/
 *.egg-info/
 
 # Python junk
