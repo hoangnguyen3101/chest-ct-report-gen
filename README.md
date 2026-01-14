@@ -17,7 +17,9 @@ cd ..
 
 ## Dataset
 
-An example dataset is provided [example_data_ct2rep.zip](https://huggingface.co/generatect/GenerateCT/blob/main/example_data_ct2rep.zip). This is to show the required dataset structure for CT2Rep and CT2RepLong. For the full dataset, please see [CT-RATE](https://huggingface.co/datasets/ibrahimhamamci/CT-RATE).
+```download dataset
+ python crawl_data.py
+```
 
 ## Train
 
