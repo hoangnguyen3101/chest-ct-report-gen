@@ -1,0 +1,17 @@
+# Ignore datasets
+dataset/
+
+# Ignore old / unused code
+CT2RepLong/
+CT2Rep_old/
+
+# Ignore experimental / build files
+ctvit/
+*.egg-info/
+
+# Python junk
+__pycache__/
+*.pyc
+*.log
+.env
+

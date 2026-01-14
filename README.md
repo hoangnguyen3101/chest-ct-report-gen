@@ -38,3 +38,7 @@ Our codes are released under a [Creative Commons Attribution (CC-BY) license](ht
 ## Acknowledgements
 This work is an extension of the following repositories: [GenerateCT](https://github.com/ibrahimethemhamamci/GenerateCT), [CT-CLIP](https://github.com/ibrahimethemhamamci/CT-CLIP), [R2Gen](https://github.com/cuhksz-nlp/R2Gen), and [Longitudinal Chest X-ray](https://github.com/celestialshine/longitudinal-chest-x-ray).
 
+
+
+###
+(ct2rep) hoangnv@s96:~/AICD_HA/ct2rep/CT2Rep$ python main.py     --max_seq_length 300     --threshold 1     --batch_size 2     --epochs 10     --ctvit_pretrain_path "models/CT_VocabFine_v2.pt"     --save_dir results/example_test_v2/

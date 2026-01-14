@@ -72,11 +72,10 @@ def parse_agrs():
     parser.add_argument('--step_size', type=int, default=50, help='the step size of the learning rate scheduler.')
     parser.add_argument('--gamma', type=float, default=0.1, help='the gamma of the learning rate scheduler.')
 
-    # Others
-    parser.add_argument('--xlsxfile', type=str, default="../example_data/train_reports.csv", help='reports csv file.')
-    parser.add_argument('--trainfolder', type=str, default="../example_data/CT2Rep/train", help='train folder.')
-    parser.add_argument('--validfolder', type=str, default="../example_data/CT2Rep/valid", help='valid folder.')
-
+    # Others  /home/hoangnv/AICD_HA/ct2rep/dataset/radgenome_files/train_region_report.csv
+    parser.add_argument('--xlsxfile', type=str, default="../dataset/radgenome_files/train_region_report.csv", help='reports csv file.')
+    parser.add_argument('--trainfolder', type=str, default="../dataset/train_preprocessed", help='train folder.')
+    parser.add_argument('--validfolder', type=str, default="../dataset/valid_preprocessed", help='valid folder.')
     parser.add_argument('--resume', type=str, help='whether to resume the training from existing checkpoints.')
 
     args = parser.parse_args()

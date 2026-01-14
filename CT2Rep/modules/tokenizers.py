@@ -25,11 +25,11 @@ class Tokenizer(object):
         accession_to_text = {}
         for index, row in df.iterrows():
             # normalize key (expected filename) and skip invalid keys
-            key = row.get('VolumeName', None)
+            key = row.get('Volumename', None)
             if pd.isna(key):
                 continue
             # normalize findings text: replace NaN with empty string and ensure string type
-            val = row.get('Findings_EN', "")
+            val = row.get('Sentence', "")
             if pd.isna(val):
                 val = ""
             else:
