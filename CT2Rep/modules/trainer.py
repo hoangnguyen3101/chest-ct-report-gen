@@ -208,18 +208,18 @@ class Trainer(BaseTrainer):
 
         self.lr_scheduler.step()
 
-        # Chuẩn bị dữ liệu log tập trung
-        wandb_log_data = {
-            "epoch": epoch,
-            "train_loss": log['train_loss'],
-            "learning_rate": self.optimizer.param_groups[0]['lr']
-        }
+        # # Chuẩn bị dữ liệu log tập trung
+        # wandb_log_data = {
+        #     "epoch": epoch,
+        #     "train_loss": log['train_loss'],
+        #     "learning_rate": self.optimizer.param_groups[0]['lr']
+        # }
 
-        # Nếu có kết quả validation từ khối if(epoch%1==0) phía trên
-        if 'val_met' in locals():
-            for k, v in val_met.items():
-                wandb_log_data[f"val_{k}"] = v
+        # # Nếu có kết quả validation từ khối if(epoch%1==0) phía trên
+        # if 'val_met' in locals():
+        #     for k, v in val_met.items():
+        #         wandb_log_data[f"val_{k}"] = v
         
-        wandb.log(wandb_log_data)
+        # wandb.log(wandb_log_data)
 
         return log

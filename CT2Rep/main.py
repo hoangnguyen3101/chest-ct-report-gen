@@ -84,13 +84,14 @@ def parse_agrs():
 
 def main():
     # parse arguments
-    args = parse_agrs()
-    wandb.init(
-        project="CT2Rep",
-        config= args,
-        name = f"run_ep{args.epochs}_lr{args.lr_ve}",
-    )
+    # args = parse_agrs()
+    # wandb.init(
+    #     project="CT2Rep",
+    #     config= args,
+    #     name = f"run_ep{args.epochs}_lr{args.lr_ve}",
+    # )
     # create tokenizer
+    args = parse_agrs()
     tokenizer = Tokenizer(args)
 
     train_ds = CTReportDataset(args,data_folder=args.trainfolder, xlsx_file=args.xlsxfile, tokenizer=tokenizer, num_frames=2)
