@@ -42,5 +42,3 @@ This work is an extension of the following repositories: [GenerateCT](https://gi
 
 
 
-###
-(ct2rep) hoangnv@s96:~/AICD_HA/ct2rep/CT2Rep$ python main.py     --max_seq_length 300     --threshold 1     --batch_size 2     --epochs 10     --ctvit_pretrain_path "models/CT_VocabFine_v2.pt"     --save_dir results/example_test_v2/
