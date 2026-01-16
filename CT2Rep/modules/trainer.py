@@ -23,7 +23,11 @@ class BaseTrainer(object):
         self.optimizer = optimizer
 
         self.epochs = self.args.epochs
-        self.save_period = self.args.save_period
+
+        # Lưu model mỗi 3 epoch
+        # self.save_period = self.args.save_period
+        self.save_period = 3
+
 
         self.mnt_mode = args.monitor_mode
         self.mnt_metric = 'val_' + args.monitor_metric
@@ -177,7 +181,8 @@ class Trainer(BaseTrainer):
         print("begin eval")
         dir_save = self.args.save_dir
         print(epoch)
-        if(epoch%1==0):
+        #  Eval mỗi 3 epoch
+        if(epoch%3==0):
             self.model.eval()
             with torch.no_grad():
                val_gts, val_res = [], []
