@@ -9,9 +9,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 from .att_model import pack_wrapper, AttModel
 
+torch._dynamo.config.suppress_errors = True
 
 def clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
@@ -26,13 +29,43 @@ def attention(query, key, value, mask=None, dropout=None):
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
+# def attention(query, key, value, mask=None, dropout=None, is_causal=False):
+#     dropout_p = 0.1
 
+#     attn_mask = None
+#     if mask is not None:
+#         if mask.dtype != torch.bool:
+#             attn_mask = (mask != 0)
+#         else:
+#             attn_mask = mask
+#         attn_mask = attn_mask.to(device=query.device)
 
+#     with torch.backends.cuda.sdp_kernel(enable_mem_efficient=True):
+#         out = F.scaled_dot_product_attention(
+#             query, key, value,
+#             attn_mask=attn_mask,        
+#             dropout_p=dropout_p,
+#             is_causal=False
+#         )
+
+#     return out, None
+# def attention(query, key, value, mask=None, dropout=None):
+#     d_k = query.size(-1)
+#     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+#     if mask is not None:
+#         scores = scores.masked_fill(mask == 0, -1e9)
+#     p_attn = F.softmax(scores, dim=-1)
+#     if dropout is not None:
+#         p_attn = dropout(p_attn)
+#     return torch.matmul(p_attn, value), p_attn
 def subsequent_mask(size):
     attn_shape = (1, size, size)
     subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
     return torch.from_numpy(subsequent_mask) == 0
 
+
+def log_info(name, var):
+    print(name, var.dtype, var.device, var.is_contiguous(), var.size(), var.stride())
 
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, rm):
@@ -47,11 +80,17 @@ class Transformer(nn.Module):
         return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask)
 
     def encode(self, src, src_mask):
+        # log_info("encoding src: ", src)
+        # log_info("encoding src mask: ", src_mask)
         return self.encoder(self.src_embed(src), src_mask)
 
     def decode(self, hidden_states, src_mask, tgt, tgt_mask):
-        memory = self.rm.init_memory(hidden_states.size(0)).to(hidden_states)
-        memory = self.rm(self.tgt_embed(tgt), memory)
+        # log_info("decoding hidden_states: ", hidden_states)
+        # log_info("decoding src mask: ", src_mask)
+        # log_info("decoding tgt: ", tgt)
+        # log_info("decoding tgt_mask: ", tgt_mask)
+        memory0 = self.rm.init_memory(hidden_states.size(0), hidden_states.device, hidden_states.dtype)
+        memory = self.rm(self.tgt_embed(tgt), memory0)
         return self.decoder(self.tgt_embed(tgt), hidden_states, src_mask, tgt_mask, memory)
 
 
@@ -59,7 +98,7 @@ class Encoder(nn.Module):
     def __init__(self, layer, N):
         super(Encoder, self).__init__()
         self.layers = clones(layer, N)
-        self.norm = LayerNorm(layer.d_model)
+        self.norm = nn.LayerNorm(layer.d_model, eps=1e-6, elementwise_affine=True)
 
     def forward(self, x, mask):
         for layer in self.layers:
@@ -83,7 +122,7 @@ class EncoderLayer(nn.Module):
 class SublayerConnection(nn.Module):
     def __init__(self, d_model, dropout):
         super(SublayerConnection, self).__init__()
-        self.norm = LayerNorm(d_model)
+        self.norm = nn.LayerNorm(d_model, eps=1e-6, elementwise_affine=True)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
@@ -107,10 +146,9 @@ class Decoder(nn.Module):
     def __init__(self, layer, N):
         super(Decoder, self).__init__()
         self.layers = clones(layer, N)
-        self.norm = LayerNorm(layer.d_model)
+        self.norm = nn.LayerNorm(layer.d_model, eps=1e-6, elementwise_affine=True)
 
     def forward(self, x, hidden_states, src_mask, tgt_mask, memory):
-        print(x.shape)
         for layer in self.layers:
             x = layer(x, hidden_states, src_mask, tgt_mask, memory)
         return self.norm(x)
@@ -261,16 +299,24 @@ class RelationalMemory(nn.Module):
         self.W = nn.Linear(self.d_model, self.d_model * 2)
         self.U = nn.Linear(self.d_model, self.d_model * 2)
 
-    def init_memory(self, batch_size):
-        memory = torch.stack([torch.eye(self.num_slots)] * batch_size)
-        if self.d_model > self.num_slots:
-            diff = self.d_model - self.num_slots
-            pad = torch.zeros((batch_size, self.num_slots, diff))
-            memory = torch.cat([memory, pad], -1)
-        elif self.d_model < self.num_slots:
-            memory = memory[:, :, :self.d_model]
+    # def init_memory(self, batch_size):
+    #     memory = torch.stack([torch.eye(self.num_slots)] * batch_size)
+    #     if self.d_model > self.num_slots:
+    #         diff = self.d_model - self.num_slots
+    #         pad = torch.zeros((batch_size, self.num_slots, diff))
+    #         memory = torch.cat([memory, pad], -1)
+    #     elif self.d_model < self.num_slots:
+    #         memory = memory[:, :, :self.d_model]
 
-        return memory
+    #     return memory
+    def init_memory(self, batch_size, device, dtype):
+        mem = torch.eye(self.num_slots, device=device, dtype=dtype).unsqueeze(0).repeat(batch_size, 1, 1)
+        if self.d_model > self.num_slots:
+            pad = torch.zeros((batch_size, self.num_slots, self.d_model - self.num_slots), device=device, dtype=dtype)
+            mem = torch.cat([mem, pad], dim=-1)
+        elif self.d_model < self.num_slots:
+            mem = mem[:, :, :self.d_model]
+        return mem.reshape(batch_size, self.num_slots * self.d_model)
 
     def forward_step(self, input, memory):
         memory = memory.reshape(-1, self.num_slots, self.d_model)
@@ -309,6 +355,7 @@ class EncoderDecoder(AttModel):
         ff = PositionwiseFeedForward(self.d_model, self.d_ff, self.dropout)
         position = PositionalEncoding(self.d_model, self.dropout)
         rm = RelationalMemory(num_slots=self.rm_num_slots, d_model=self.rm_d_model, num_heads=self.rm_num_heads)
+        # rm = torch.compile(rm, fullgraph=True, mode="default")
         model = Transformer(
             Encoder(EncoderLayer(self.d_model, c(attn), c(ff), self.dropout), self.num_layers),
             Decoder(
@@ -321,6 +368,8 @@ class EncoderDecoder(AttModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
         return model
+        # compiled_model = torch.compile(model)
+        # return compiled_model
 
     def __init__(self, args, tokenizer):
         super(EncoderDecoder, self).__init__(args, tokenizer)
@@ -335,10 +384,24 @@ class EncoderDecoder(AttModel):
         self.rm_d_model = args.rm_d_model
 
         tgt_vocab = self.vocab_size + 1
-
         self.model = self.make_model(tgt_vocab)
+        # self.model = torch.compile(model, mode="default", fullgraph=False)
+        # self.pure_model = self.make_model(tgt_vocab)
+        # self.warmup_()
         self.logit = nn.Linear(args.d_model, tgt_vocab)
 
+    def warmup_(self):
+        self.pure_model = self.pure_model.cuda()
+        self.model = torch.compile(self.pure_model, mode='default', fullgraph=False)
+        att_feats = torch.rand(1, 1000, 512).cuda()
+        seq = torch.randint(0, self.vocab_size, (1, 299), device="cuda", dtype=torch.long)
+        att_masks  = torch.ones(1, 1, 1000, device="cuda", dtype=torch.bool)
+        seq_mask   = torch.ones(1, 299, 299, device="cuda", dtype=torch.bool) 
+        with torch.no_grad():
+            _ = self.model(att_feats, seq, att_masks, seq_mask)
+        print("###", att_feats.size(), seq.size(), att_masks.size(), seq_mask.size())
+        
+        return 0
     def init_hidden(self, bsz):
         return []
 

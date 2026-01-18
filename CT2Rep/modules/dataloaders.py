@@ -19,7 +19,7 @@ class R2DataLoader(DataLoader):
             'batch_size': self.batch_size,
             'shuffle': self.shuffle,
             'collate_fn': self.collate_fn,
-            'num_workers': self.num_workers
+            'num_workers': self.num_workers,
         }
         super().__init__(**self.init_kwargs)
 
@@ -27,7 +27,7 @@ class R2DataLoader(DataLoader):
     def collate_fn(data):
         images_id, images, reports_ids, reports_masks, seq_lengths = zip(*data)
         images = torch.stack(images, 0)
-        max_seq_length = max(seq_lengths)
+        max_seq_length = 300 #max(seq_lengths)
         targets = np.zeros((len(reports_ids), max_seq_length), dtype=int)
         targets_masks = np.zeros((len(reports_ids), max_seq_length), dtype=int)
 

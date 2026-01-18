@@ -5,6 +5,7 @@ import time
 import torch
 import pandas as pd
 from numpy import inf
+import tqdm 
 import csv
 import wandb
 
@@ -15,6 +16,8 @@ class BaseTrainer(object):
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(args.n_gpu)
         self.model = model.to(self.device)
+        # self.model.encoder_decoder.model.rm = torch.compile(self.model.encoder_decoder.model.rm, fullgraph=True, mode="default")
+        self.model.encoder_decoder.model = torch.compile(self.model.encoder_decoder.model, fullgraph=True, mode="default")
         if len(device_ids) > 1:
             self.model = torch.nn.DataParallel(model, device_ids=device_ids)
 
@@ -57,7 +60,7 @@ class BaseTrainer(object):
             # save logged informations into log dict
             log = {'epoch': epoch}
             log.update(result)
-            self._record_best(log)
+            # self._record_best(log)
 
             # print logged informations to the screen
             for key, value in log.items():
@@ -149,6 +152,7 @@ class BaseTrainer(object):
             print('\t{:15s}: {}'.format(str(key), value))
 
 
+import time
 class Trainer(BaseTrainer):
     def __init__(self, model, criterion, metric_ftns, optimizer, args, lr_scheduler, train_dataloader, val_dataloader,
                  test_dataloader):
@@ -159,52 +163,72 @@ class Trainer(BaseTrainer):
         self.test_dataloader = test_dataloader
 
     def _train_epoch(self, epoch):
-
-        train_loss = 0
+        
+        train_loss = 0.0
         self.model.train()
+        start_time = time.time()
+
+        print("warming up:")
         for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
+            if batch_idx == 5:
+                break
             images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), reports_masks.to(
                 self.device)
             output = self.model(images, reports_ids, mode='train')
             loss = self.criterion(output, reports_ids, reports_masks)
-            train_loss += loss.item()
+            
             self.optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_value_(self.model.parameters(), 0.1)
             self.optimizer.step()
+            train_loss += loss.item()
+        
+        print("end of warm up: ", time.time() - start_time)
+
+        for batch_idx, (images_id, images, reports_ids, reports_masks) in tqdm.tqdm(enumerate(self.train_dataloader)):
+            images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(self.device), reports_masks.to(
+                self.device)
+            output = self.model(images, reports_ids, mode='train')
+            loss = self.criterion(output, reports_ids, reports_masks)
+            
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_value_(self.model.parameters(), 0.1)
+            self.optimizer.step()
+            train_loss += loss.item()
         log = {'train_loss': train_loss / len(self.train_dataloader)}
 
-        print("begin eval")
-        dir_save = self.args.save_dir
-        print(epoch)
-        if(epoch%1==0):
-            self.model.eval()
-            with torch.no_grad():
-               val_gts, val_res = [], []
-               gts=f"{dir_save}/"+str(epoch)+"gts.csv"
-               res=f"{dir_save}/"+str(epoch)+"res.csv"
+        # print("begin eval")
+        # dir_save = self.args.save_dir
+        # print(epoch)
+        # if(epoch%1==0):
+        #     self.model.eval()
+        #     with torch.no_grad():
+        #        val_gts, val_res = [], []
+        #        gts=f"{dir_save}/"+str(epoch)+"gts.csv"
+        #        res=f"{dir_save}/"+str(epoch)+"res.csv"
 
 
-               with open(gts,"w",newline="") as gtss:
-                with open(res,"w",newline="") as ress:
-                   for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
-                        images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
-                            self.device), reports_masks.to(self.device)
-                        output = self.model(images, mode='sample')
-                        reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
-                        ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
-                        val_res.extend(reports)
-                        val_gts.extend(ground_truths)
-                        gt_writer=csv.writer(gtss)
-                        gen_writer=csv.writer(ress)
-                        for x in range(len(reports)):
-                          gt_writer.writerow([str(ground_truths[x])])
-                          gen_writer.writerow([str(reports[x])])
-                gtss.close()
-                ress.close()
-                val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(val_gts)},
-                                           {i: [re] for i, re in enumerate(val_res)})
-                log.update(**{'val_' + k: v for k, v in val_met.items()})
+        #        with open(gts,"w",newline="") as gtss:
+        #         with open(res,"w",newline="") as ress:
+        #            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
+        #                 images, reports_ids, reports_masks = images.to(self.device), reports_ids.to(
+        #                     self.device), reports_masks.to(self.device)
+        #                 output = self.model(images, mode='sample')
+        #                 reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
+        #                 ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
+        #                 val_res.extend(reports)
+        #                 val_gts.extend(ground_truths)
+        #                 gt_writer=csv.writer(gtss)
+        #                 gen_writer=csv.writer(ress)
+        #                 for x in range(len(reports)):
+        #                   gt_writer.writerow([str(ground_truths[x])])
+        #                   gen_writer.writerow([str(reports[x])])
+        #         gtss.close()
+        #         ress.close()
+        #         val_met = self.metric_ftns({i: [gt] for i, gt in enumerate(val_gts)},
+        #                                    {i: [re] for i, re in enumerate(val_res)})
+        #         log.update(**{'val_' + k: v for k, v in val_met.items()})
 
         self.lr_scheduler.step()
 
