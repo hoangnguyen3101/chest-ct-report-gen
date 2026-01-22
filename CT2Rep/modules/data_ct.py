@@ -39,57 +39,14 @@ class CTReportDataset(Dataset):
         self.nii_to_tensor = partial(self.nii_img_to_tensor, transform = self.transform)
         self.cast_num_frames_fn = partial(cast_num_frames, frames = num_frames) if force_num_frames else identity
 
-    # def load_accession_text(self, csv_file):
-    #     df = pd.read_csv(csv_file)
-    #     accession_to_text = {}
-    #     for index, row in df.iterrows():
-    #         key = row.get('Volumename', None)
-    #         if pd.isna(key):
-    #             continue
-    #         val = row.get('Sentence', "")
-    #         if pd.isna(val):
-    #             val = ""
-    #         else:
-    #             val = str(val)
-    #         accession_to_text[str(key)] = val
-    #     return accession_to_text
-
     def load_accession_text(self, csv_file):
         df = pd.read_csv(csv_file)
-        df.columns = [c.strip() for c in df.columns] # loại bỏ khoảng thừa
-        
         accession_to_text = {}
-        
-        # Check if Volumename exists
-        if 'Volumename' not in df.columns:
-            print(f"ERROR: 'Volumename' column not found. Available: {list(df.columns)}")
-            return {}
-
-        # Fill NaNs
-        df = df.fillna('')
-        
-        grouped = df.groupby('Volumename') #gom nhóm các hàng có chung tên file ảnh
-        for name, group in grouped:
-            report_parts = []
-            for index, row in group.iterrows():
-                try:
-                    anatomy = str(row.get('Anatomy', '')).strip() # lấy tên vùng cơ thể
-                    sentence = str(row.get('Sentence', '')).strip() # lấy mô tả vùng cơ thể
-                    
-
-                    if anatomy and sentence: 
-                        report_parts.append(f"{anatomy} {sentence}") # nếu có cả 2 thì  nối lại theo dạng  phổi: mô tả phổi
-                    elif sentence:
-                        report_parts.append(sentence)
-                except Exception as e:
-                    print(f"Error processing row {index}: {e}")
-            
-            # Combine all parts into one single string
-            if report_parts:
-                accession_to_text[str(name)] = ". ".join(report_parts)
-                
+        for index, row in df.iterrows():
+            if not str(row.get('Anatomy', '')).strip():
+                accession_to_text[row['Volumename']] = row["Sentence"]
         return accession_to_text
-
+    
 
     def prepare_samples(self):
         samples = []
