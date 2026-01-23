@@ -43,7 +43,8 @@ class CTReportDataset(Dataset):
         df = pd.read_csv(csv_file)
         accession_to_text = {}
         for index, row in df.iterrows():
-            if not str(row.get('Anatomy', '')).strip():
+            anatomy = row.get('Anatomy', '')
+            if pd.isna(anatomy) or str(anatomy).strip() == "":
                 accession_to_text[row['Volumename']] = row["Sentence"]
         return accession_to_text
     

@@ -24,19 +24,22 @@ class Tokenizer(object):
         df = pd.read_csv(csv_file)
         accession_to_text = {}
         for index, row in df.iterrows():
-            # normalize key (expected filename) and skip invalid keys
-            key = row.get('Volumename', None)
-            if pd.isna(key):
-                continue
-            # normalize findings text: replace NaN with empty string and ensure string type
-            val = row.get('Sentence', "")
-            if pd.isna(val):
-                val = ""
-            else:
-                val = str(val)
-            accession_to_text[str(key)] = val
+            # Filter: only take rows WITHOUT anatomy (handle NaN correctly)
+            anatomy = row.get('Anatomy', '')
+            if pd.isna(anatomy) or str(anatomy).strip() == "":
+                # normalize key (expected filename) and skip invalid keys
+                key = row.get('Volumename', None)
+                if pd.isna(key):
+                    continue
+                # normalize findings text: replace NaN with empty string and ensure string type
+                val = row.get('Sentence', "")
+                if pd.isna(val):
+                    val = ""
+                else:
+                    val = str(val)
+                accession_to_text[str(key)] = val
         return accession_to_text
-
+    
     def create_vocabulary(self):
         total_tokens = []
 
